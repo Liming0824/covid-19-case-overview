@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <!-- Load d3.js -->
+    <script src="http://d3js.org/d3.v4.js"></script>
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+    <script src="https://d3js.org/d3-geo-projection.v2.min.js"></script>
+
+    <meta
+      name="description"
+      content="Web site created using create-react-app"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <!--
+      manifest.json provides metadata used when your web app is installed on a
+      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
+    -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <!--
+      Notice the use of %PUBLIC_URL% in the tags above.
+      It will be replaced with the URL of the `public` folder during the build.
+      Only files inside the `public` folder can be referenced from the HTML.
+
+      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
+      work correctly both with client-side routing and a non-root public URL.
+      Learn how to configure a non-root public URL by running `npm run build`.
+    -->
+    <title>React App</title>
+  </head>
+  <body>
+    <svg id="my_dataviz" width="800" height="600"></svg>
+    <script>
+    // The svg
+    var svg = d3.select("svg"),
+      width = +svg.attr("width"),
+      height = +svg.attr("height");
+
+    // Map and projection
+    var projection = d3.geoMercator()
+      .scale(140)
+      .center([0,40])
+      .translate([width / 2, height / 2]);
+
+    // Data and color scale
+    var data = d3.map();
+    var totalDeath = d3.map();
+    var colorScale = d3.scaleThreshold()
+      .domain([500, 2000, 5000, 10000, 50000, 100000])
+      .range(d3.schemeReds[7]);
+
+    // Load external data and boot
+    d3.queue()
+      .defer(d3.json, "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson")
+      .defer(d3.json, "https://api.covid19api.com/summary")
+      .await(ready);
+
+  function ready(error, topo, json) {
+
+    let mouseOver = function(d) {
+      d3.selectAll(".Country")
+        .transition()
+        .duration(200)
+        .style("opacity", .5)
+      d3.select(this)
+        .transition()
+        .duration(200)
+        .style("opacity", 1)
+        .style("stroke", "black")
+      var countryNode = document.getElementById('country-name');
+      countryNode.innerHTML = d.properties.name;
+      var totalDeathNode = document.getElementById('total-death');
+      totalDeathNode.innerHTML = 'Total Death: ' + totalDeath.get(d.id.substring(0,2));
+      var totalConfirmedNode = document.getElementById('total-confirmed');
+      totalConfirmedNode.innerHTML = 'Total Confirmed: ' + data.get(d.id.substring(0,2));
+    }
+
+    let mouseLeave = function(d) {
+      d3.selectAll(".Country")
+        .transition()
+        .duration(200)
+        .style("opacity", .8)
+      d3.select(this)
+        .transition()
+        .duration(200)
+        .style("stroke", "transparent")
+    }
+
+      if(json){
+        // topo is from first defer, json is from second defer
+        json.Countries.forEach(function(c){
+          data.set(c.CountryCode, +c.TotalConfirmed)
+          totalDeath.set(c.CountryCode, +c.TotalDeaths)
+        })
+
+        // Draw the map
+        svg.append("g")
+          .selectAll("path")
+          .data(topo.features)
+          .enter()
+          .append("path")
+            // draw each country
+            .attr("d", d3.geoPath()
+              .projection(projection)
+            )
+            // set the color of each country
+            .attr("fill", function (d) {
+              d.total = data.get(d.id.substring(0,2)) || 0;
+              return colorScale(d.total);
+            })
+            .style("stroke", "transparent")
+            .attr("class", function(d){ return "Country" } )
+            .style("opacity", .8)
+            .on("mouseover", mouseOver )
+            .on("mouseleave", mouseLeave )
+      } else {
+        var root_1 = document.getElementById('root-1');
+        root_1.innerHTML = 'Sent too many request, please refresh the page in few minutes';
+      }
+    }
+
+    </script>
+    <div id="page-title">COVID 19 Cases Overview by Country</div>
+    <div id="root-1">
+      <li id="country-name">Country</li>
+      <li id="total-death">Total Death</li>
+      <li id="total-confirmed">Total Confirmed</li>
+    </div>
+    <div id="root-2"></div>
+  </body>
+</html>
